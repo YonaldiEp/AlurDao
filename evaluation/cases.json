@@ -1,0 +1,62 @@
+[
+  {
+    "id": "xianxia-basic-cultivation",
+    "genre": "xianxia",
+    "sourceText": "林玄缓缓睁开双眼，丹田内的灵气如江河般奔涌。他知道，自己终于突破了筑基境。山洞之外，晨雾笼罩着青云峰。",
+    "glossary": [
+      { "sourceTerm": "丹田", "translatedTerm": "dantian" },
+      { "sourceTerm": "灵气", "translatedTerm": "energi spiritual" }
+    ],
+    "expectedTerms": ["dantian", "energi spiritual"]
+  },
+  {
+    "id": "xuanhuan-bloodline-realm",
+    "genre": "xuanhuan",
+    "sourceText": "少年体内沉睡的远古血脉突然苏醒，他的境界也随之不断攀升。",
+    "glossary": [
+      { "sourceTerm": "血脉", "translatedTerm": "garis keturunan" },
+      { "sourceTerm": "境界", "translatedTerm": "ranah" }
+    ],
+    "expectedTerms": ["garis keturunan", "ranah"]
+  },
+  {
+    "id": "wuxia-internal-power",
+    "genre": "wuxia",
+    "sourceText": "他运转内力，施展轻功越过高墙，悄无声息地落在院中。",
+    "glossary": [
+      { "sourceTerm": "内力", "translatedTerm": "tenaga dalam" },
+      { "sourceTerm": "轻功", "translatedTerm": "ilmu meringankan tubuh" }
+    ],
+    "expectedTerms": ["tenaga dalam", "ilmu meringankan tubuh"]
+  },
+  {
+    "id": "qihuan-magic-creature",
+    "genre": "qihuan",
+    "sourceText": "年轻法师举起法杖，魔法阵在脚下亮起，将扑来的魔兽困在其中。",
+    "glossary": [
+      { "sourceTerm": "魔法阵", "translatedTerm": "lingkaran sihir" },
+      { "sourceTerm": "魔兽", "translatedTerm": "monster magis" }
+    ],
+    "expectedTerms": ["lingkaran sihir", "monster magis"]
+  },
+  {
+    "id": "mohuan-demon-curse",
+    "genre": "mohuan",
+    "sourceText": "古老的魔神从深渊中苏醒，王城上空的诅咒再次蔓延。",
+    "glossary": [
+      { "sourceTerm": "魔神", "translatedTerm": "dewa iblis" },
+      { "sourceTerm": "诅咒", "translatedTerm": "kutukan" }
+    ],
+    "expectedTerms": ["dewa iblis", "kutukan"]
+  },
+  {
+    "id": "kehuan-starship-ai",
+    "genre": "kehuan",
+    "sourceText": "星舰脱离虫洞后，舰载人工智能立刻开始计算新的航线。",
+    "glossary": [
+      { "sourceTerm": "星舰", "translatedTerm": "kapal antariksa" },
+      { "sourceTerm": "人工智能", "translatedTerm": "kecerdasan buatan" }
+    ],
+    "expectedTerms": ["kapal antariksa", "kecerdasan buatan"]
+  }
+]

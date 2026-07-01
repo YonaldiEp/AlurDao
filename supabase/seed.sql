@@ -1,0 +1,1 @@
+-- Seed data is intentionally empty. User-owned data is created after authentication.
