@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, BookOpenText, LoaderCircle, LockKeyhole, Mail, UserRound } from "lucide-react";
+import { ArrowLeft, BookOpenText, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, UserRound } from "lucide-react";
+import { DisplayPreferences } from "@/components/display-preferences";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "register";
@@ -15,8 +16,10 @@ export function AuthForm() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
@@ -49,9 +52,29 @@ export function AuthForm() {
       router.replace("/studio");
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Autentikasi gagal diproses.");
+      const rawMessage = error instanceof Error ? error.message.toLowerCase() : "";
+      if (rawMessage.includes("invalid login credentials")) setMessage("Email atau password tidak benar.");
+      else if (rawMessage.includes("email not confirmed")) setMessage("Email belum dikonfirmasi. Periksa kotak masuk atau folder spam.");
+      else if (rawMessage.includes("already registered") || rawMessage.includes("already exists")) setMessage("Email ini sudah terdaftar. Silakan masuk.");
+      else if (rawMessage.includes("password") && rawMessage.includes("least")) setMessage("Password harus terdiri dari minimal 8 karakter.");
+      else setMessage(error instanceof Error ? error.message : "Autentikasi gagal diproses.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setMessage("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=/studio`,
+      },
+    });
+    if (error) {
+      setMessage(error.message);
+      setGoogleLoading(false);
     }
   }
 
@@ -72,7 +95,7 @@ export function AuthForm() {
 
       <section className="auth-panel">
         <div className="auth-card">
-          <Link href="/" className="auth-back"><ArrowLeft size={15} /> Kembali ke beranda</Link>
+          <div className="auth-utility-row"><Link href="/" className="auth-back"><ArrowLeft size={15} /> Kembali ke beranda</Link><DisplayPreferences /></div>
           <div className="auth-heading">
             <span>{mode === "login" ? "Selamat datang kembali" : "Mulai perjalanan baru"}</span>
             <h2>{mode === "login" ? "Masuk ke AlurDao" : "Buat akun AlurDao"}</h2>
@@ -83,6 +106,17 @@ export function AuthForm() {
             <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setMessage(""); }}>Masuk</button>
             <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setMessage(""); }}>Daftar</button>
           </div>
+
+          <button
+            className="google-auth-button"
+            onClick={() => void signInWithGoogle()}
+            disabled={googleLoading || loading}
+          >
+            {googleLoading ? <LoaderCircle className="spinner" size={18} /> : <span className="google-mark">G</span>}
+            {googleLoading ? "Menghubungkan Google..." : "Lanjutkan dengan Google"}
+          </button>
+
+          <div className="auth-divider"><span>atau gunakan email</span></div>
 
           <form onSubmit={submit} className="auth-form-fields">
             {mode === "register" && (
@@ -97,10 +131,11 @@ export function AuthForm() {
             </label>
             <label>
               <span>Password</span>
-              <div><LockKeyhole size={17} /><input type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required placeholder="Minimal 8 karakter" autoComplete={mode === "login" ? "current-password" : "new-password"} /></div>
+              <div><LockKeyhole size={17} /><input type={showPassword ? "text" : "password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required placeholder="Minimal 8 karakter" autoComplete={mode === "login" ? "current-password" : "new-password"} /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"} title={showPassword ? "Sembunyikan password" : "Tampilkan password"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
             </label>
+            <p className="auth-helper">{mode === "login" ? "Gunakan akun yang pernah kamu daftarkan atau masuk lebih cepat dengan Google." : "Gunakan minimal 8 karakter. Setelah mendaftar, kamu mungkin perlu mengonfirmasi email."}</p>
 
-            {message && <div className="auth-message" role="status">{message}</div>}
+            {message && <div className="auth-message" role="status" aria-live="polite">{message}</div>}
 
             <button className="button button-primary auth-submit" disabled={loading}>
               {loading && <LoaderCircle className="spinner" size={17} />}

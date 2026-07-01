@@ -108,7 +108,7 @@ export function TranslationWorkspace() {
           <div className="usage-box">
             <div><span>Kuota bulanan</span><strong>12%</strong></div>
             <div className="usage-track"><i /></div>
-            <small>12.340 dari 100.000 karakter</small>
+            <small>12.340 dari 15.000 karakter</small>
           </div>
           <button className="profile-button">
             <span className="avatar">YE</span>

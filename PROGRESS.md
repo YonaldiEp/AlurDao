@@ -5,7 +5,10 @@ Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis
 ## Status
 
 - [x] Landing page dan workspace awal
+- [x] Demo terjemahan landing page: 2 percobaan/24 jam, 500 karakter, cookie HMAC HttpOnly
+- [x] Perbandingan paket Demo, Free, dan Premium (segera hadir) pada landing page
 - [x] Supabase PostgreSQL, migration, relasi, dan Row Level Security
+- [x] Project Supabase Cloud AlurDao terhubung dan migration 001-006 tersinkron
 - [x] Adapter demo, Mistral, Gemini, Groq, dan Ollama
 - [x] Konfigurasi awal enam genre novel China
 - [x] Kontrak response API JSON yang konsisten
@@ -23,11 +26,24 @@ Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis
 - [x] Glosarium global terhubung ke glosarium project
 - [x] Riwayat proses terjemahan tersimpan di PostgreSQL
 - [x] Logout dan kontrol sidebar
+- [x] Google OAuth button dan callback PKCE
+- [x] Google OAuth credentials aktif pada Supabase Cloud; endpoint terverifikasi redirect ke Google
+- [x] Paket free: 2 project, 10 bab/project, 15.000 karakter/bulan, 5.000 karakter/request
+- [x] Role admin tanpa kuota bulanan, maksimal 20.000 karakter/request, dengan plan/limit terkunci dari browser
+- [x] Auth wajib pada endpoint terjemahan
+- [x] Reservasi dan refund kuota secara atomik
+- [x] Pencatatan riwayat terjemahan dipindahkan ke server
+- [x] Security headers dasar Next.js
+- [x] Tema terang/gelap/sistem dan skala tampilan responsif tersimpan per perangkat
+- [x] Optimasi posisi kontrol tampilan, autofill input dark mode, dan judul drawer untuk project panjang
+- [x] Perbaikan overflow card dan ellipsis judul project pada sidebar
+- [x] Prompt penyuntingan akhir untuk SPOK, PUEBI, typo, repetisi, dan konsistensi bahasa target
+- [x] Catatan revisi manual PPT untuk nilai jual slide 3 dan indexing Google slide 5
 - [ ] Persiapan layanan Python untuk AI lokal lanjutan
 
 ## Sedang Dikerjakan
 
-Mengaktifkan Mistral dengan API key baru dan menjalankan evaluasi semantik enam genre.
+Menguji login Google secara interaktif sampai kembali ke Studio, lalu menjalankan evaluasi semantik enam genre.
 
 ## Keputusan Teknis
 
@@ -41,6 +57,8 @@ Mengaktifkan Mistral dengan API key baru dan menjalankan evaluasi semantik enam 
 - Project dan Bab 1 dibuat atomik melalui fungsi PostgreSQL.
 - Autosave berjalan 900 milidetik setelah perubahan terakhir.
 - Workspace menggunakan Supabase secara langsung dengan perlindungan RLS.
+- Kuota freemium ditegakkan oleh PostgreSQL dan endpoint server, bukan UI.
+- Request AI tanpa sesi login ditolak sebelum provider dipanggil.
 
 ## Pengujian Fitur Nyata
 
@@ -55,6 +73,14 @@ Mengaktifkan Mistral dengan API key baru dan menjalankan evaluasi semantik enam 
 - Penambahan Bab 2: lulus
 
 ## Hasil Evaluasi
+
+### Smoke Test Mistral - 1 Juli 2026
+
+- Login/token pengguna pada endpoint terjemahan: lulus
+- Provider `mistral-small-latest`: lulus
+- Hasil Mandarin ke Indonesia: lulus
+- Pencatatan kuota server: lulus
+- Evaluasi semantik penuh untuk enam genre: belum dijalankan
 
 ### Baseline Demo — 1 Juli 2026
 

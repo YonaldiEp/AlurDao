@@ -15,6 +15,7 @@ import {
   LoaderCircle,
   LogOut,
   PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RotateCcw,
   Search,
@@ -23,7 +24,8 @@ import {
   X,
 } from "lucide-react";
 import { genreOptions, type GenreId } from "@/config/genres";
-import type { TranslationResult } from "@/lib/ai/schema";
+import { DisplayPreferences } from "@/components/display-preferences";
+import type { TranslationResult, ExtractedTerm } from "@/lib/ai/schema";
 import type { ApiResponse } from "@/lib/api/response";
 import { createClient } from "@/lib/supabase/client";
 
@@ -74,6 +76,27 @@ type GlobalTerm = {
 type GlossaryApiData = { terms: GlobalTerm[]; count: number };
 type SaveState = "saved" | "dirty" | "saving" | "error";
 
+type UserProfile = {
+  plan: string;
+  monthly_character_limit: number;
+  characters_used: number;
+  project_limit: number;
+  chapter_limit_per_project: number;
+  quota_period_start: string;
+};
+
+type TranslationQuota = {
+  allowed: boolean;
+  unlimited: boolean;
+  plan: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  periodStart: string;
+};
+
+type TranslationApiResult = TranslationResult & { quota: TranslationQuota };
+
 const emptySource = "";
 const categoryMap: Record<string, string> = {
   organization: "sect",
@@ -91,6 +114,7 @@ export function FunctionalWorkspace() {
   const lastSavedRef = useRef("");
   const [booting, setBooting] = useState(true);
   const [userName, setUserName] = useState("Pengguna");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -111,6 +135,33 @@ export function FunctionalWorkspace() {
   const [glossarySearch, setGlossarySearch] = useState("");
   const [globalTerms, setGlobalTerms] = useState<GlobalTerm[]>([]);
   const [glossaryLoading, setGlossaryLoading] = useState(false);
+  const [extractedTerms, setExtractedTerms] = useState<ExtractedTerm[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (window.matchMedia("(max-width: 700px)").matches) setSidebarOpen(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  type Toast = {
+    id: string;
+    type: "success" | "info" | "error";
+    message: string;
+  };
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = useCallback((message: string, type: Toast["type"] = "info") => {
+    const id = crypto.randomUUID();
+    setToasts((current) => [...current, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isAddingChapter, setIsAddingChapter] = useState(false);
 
   const loadProjectData = useCallback(async (project: Project) => {
     const [chapterResult, glossaryResult] = await Promise.all([
@@ -166,6 +217,16 @@ export function FunctionalWorkspace() {
     }
   }, [loadProjectData, supabase]);
 
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("plan, monthly_character_limit, characters_used, project_limit, chapter_limit_per_project, quota_period_start")
+      .eq("id", userId)
+      .single();
+    if (error) throw error;
+    setProfile(data as UserProfile);
+  }, [supabase]);
+
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -184,7 +245,7 @@ export function FunctionalWorkspace() {
       );
 
       try {
-        await loadProjects();
+        await Promise.all([loadProjects(), loadProfile(data.user.id)]);
       } catch (loadError) {
         setMessage(loadError instanceof Error ? loadError.message : "Data workspace gagal dimuat.");
       } finally {
@@ -193,7 +254,7 @@ export function FunctionalWorkspace() {
     })();
 
     return () => { active = false; };
-  }, [loadProjects, router, supabase]);
+  }, [loadProfile, loadProjects, router, supabase]);
 
   useEffect(() => {
     if (!activeChapter) return;
@@ -277,7 +338,9 @@ export function FunctionalWorkspace() {
     });
     setCreatingProject(false);
     if (error) {
-      setMessage(error.message);
+      setMessage(error.message.includes("PROJECT_LIMIT_REACHED")
+        ? "Batas 3 project untuk paket Gratis telah tercapai."
+        : error.message);
       return;
     }
     setNewProjectTitle("");
@@ -296,31 +359,92 @@ export function FunctionalWorkspace() {
 
   async function addChapter() {
     if (!activeProject) return;
-    const nextNumber = Math.max(0, ...chapters.map((chapter) => chapter.chapter_number)) + 1;
-    const { data, error } = await supabase
-      .from("chapters")
-      .insert({ project_id: activeProject.id, chapter_number: nextNumber, title: `Bab ${nextNumber}` })
-      .select("*")
-      .single();
-    if (error) { setMessage(error.message); return; }
-    const chapter = data as Chapter;
-    setChapters((current) => [...current, chapter]);
-    selectChapter(chapter);
-    setMessage(`Bab ${nextNumber} ditambahkan`);
+    if (isAddingChapter) return;
+
+    const nextDefaultNumber = chapters.length > 0 ? Math.max(...chapters.map((c) => c.chapter_number)) + 1 : 1;
+    const input = window.prompt("Masukkan nomor bab baru:", String(nextDefaultNumber));
+    if (input === null) return;
+
+    const chosenNumber = parseInt(input.trim(), 10);
+    if (isNaN(chosenNumber) || chosenNumber <= 0) {
+      showToast("Nomor bab harus berupa angka bulat positif.", "error");
+      return;
+    }
+
+    if (chapters.some((c) => c.chapter_number === chosenNumber)) {
+      showToast(`Bab ${chosenNumber} sudah ada di project ini.`, "error");
+      return;
+    }
+
+    const allowedChapters = profile?.chapter_limit_per_project ?? 30;
+    if (profile && profile.plan !== "admin" && chapters.length >= allowedChapters) {
+      showToast("Batas bab paket Gratis telah tercapai.", "error");
+      return;
+    }
+
+    setIsAddingChapter(true);
+    setMessage("Sedang menambahkan bab baru...");
+    try {
+      const { data, error } = await supabase
+        .from("chapters")
+        .insert({
+          project_id: activeProject.id,
+          chapter_number: chosenNumber,
+          title: `Bab ${chosenNumber}`,
+          source_text: "",
+          translated_text: "",
+        })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      const chapter = data as Chapter;
+      setChapters((current) => [...current, chapter].sort((a, b) => a.chapter_number - b.chapter_number));
+      selectChapter(chapter);
+      setMessage(`Bab ${chapter.chapter_number} ditambahkan`);
+      showToast(`Bab ${chapter.chapter_number} berhasil ditambahkan!`, "success");
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Gagal menambahkan bab baru.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setIsAddingChapter(false);
+    }
   }
 
   async function deleteChapter() {
     if (!activeChapter || chapters.length <= 1) {
-      setMessage("Project harus memiliki minimal satu bab.");
+      showToast("Project harus memiliki minimal satu bab.", "info");
       return;
     }
+    if (isDeleting) return;
     if (!window.confirm(`Hapus ${activeChapter.title || `Bab ${activeChapter.chapter_number}`}?`)) return;
-    const { error } = await supabase.from("chapters").delete().eq("id", activeChapter.id);
-    if (error) { setMessage(error.message); return; }
-    const remaining = chapters.filter((chapter) => chapter.id !== activeChapter.id);
-    setChapters(remaining);
-    selectChapter(remaining[0]);
-    setMessage("Bab dihapus");
+
+    setIsDeleting(true);
+    setMessage("Sedang menghapus bab...");
+    try {
+      const { error } = await supabase.from("chapters").delete().eq("id", activeChapter.id);
+      if (error) throw error;
+
+      const remaining = chapters.filter((chapter) => chapter.id !== activeChapter.id);
+      setChapters(remaining);
+      selectChapter(remaining[0]);
+      setMessage("Bab dihapus");
+      showToast("Bab berhasil dihapus.", "success");
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Gagal menghapus bab.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  function clearSource() {
+    if (!sourceText.trim() || window.confirm("Kosongkan seluruh teks sumber pada bab ini?")) {
+      setSourceText("");
+    }
   }
 
   async function updateProjectSetting(update: Partial<Project>) {
@@ -339,12 +463,12 @@ export function FunctionalWorkspace() {
     }
     setIsTranslating(true);
     setMessage("AI sedang memahami konteks bab...");
-    const startedAt = Date.now();
     try {
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          chapterId: activeChapter.id,
           sourceText,
           sourceLanguage: activeProject.source_language === "zh" ? "Chinese" : activeProject.source_language,
           targetLanguage: activeProject.target_language === "id" ? "Indonesian" : activeProject.target_language,
@@ -357,21 +481,21 @@ export function FunctionalWorkspace() {
           })),
         }),
       });
-      const result = (await response.json()) as ApiResponse<TranslationResult>;
+      const result = (await response.json()) as ApiResponse<TranslationApiResult>;
       if (!result.success) throw new Error(result.error.message);
       setTranslation(result.data.translation);
       setMessage(`Selesai melalui ${result.data.provider} · ${result.data.model}`);
-      await supabase.from("translation_runs").insert({
-        chapter_id: activeChapter.id,
-        provider: result.data.provider,
-        model: result.data.model,
-        input_characters: Array.from(sourceText).length,
-        output_characters: Array.from(result.data.translation).length,
-        duration_ms: Date.now() - startedAt,
-        status: "completed",
-      });
+      showToast("Terjemahan bab selesai diproses!", "success");
+      setProfile((current) => current ? {
+        ...current,
+        characters_used: result.data.quota.used,
+        monthly_character_limit: result.data.quota.limit,
+        quota_period_start: result.data.quota.periodStart,
+      } : current);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Terjemahan gagal diproses.");
+      const errMsg = error instanceof Error ? error.message : "Terjemahan gagal diproses.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
     } finally {
       setIsTranslating(false);
     }
@@ -395,6 +519,99 @@ export function FunctionalWorkspace() {
     if (error) { setMessage(error.message); return; }
     setProjectGlossary((current) => [...current, data as ProjectGlossary]);
     setMessage(`${term.source_term} ditambahkan ke glosarium project`);
+  }
+
+  async function addCustomGlossaryTerm(term: {
+    sourceTerm: string;
+    pinyin: string;
+    translatedTerm: string;
+    category: string;
+    notes?: string;
+  }) {
+    if (!activeProject || projectGlossary.some((entry) => entry.source_term === term.sourceTerm)) return;
+    const mappedCategory = categoryMap[term.category] || term.category || "other";
+    const { data, error } = await supabase
+      .from("glossary_entries")
+      .insert({
+        project_id: activeProject.id,
+        source_term: term.sourceTerm,
+        pinyin: term.pinyin,
+        translated_term: term.translatedTerm,
+        category: mappedCategory,
+        notes: term.notes || null,
+      })
+      .select("*")
+      .single();
+    if (error) { setMessage(error.message); return; }
+    setProjectGlossary((current) => [...current, data as ProjectGlossary]);
+    setMessage(`"${term.sourceTerm}" ditambahkan ke glosarium project`);
+  }
+
+  async function extractGlossary() {
+    if (!sourceText.trim() || !activeProject) {
+      setMessage("Masukkan teks bab terlebih dahulu.");
+      return;
+    }
+    setIsExtracting(true);
+    setMessage("AI sedang memindai dan mengekstrak entitas...");
+    try {
+      const response = await fetch("/api/glossary/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceText,
+          genre: activeProject.genre,
+        }),
+      });
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error.message);
+      setExtractedTerms(result.data.terms);
+      setMessage(`Berhasil memindai ${result.data.count} istilah dari bab ini.`);
+      showToast(`Pencarian kosakata selesai! Menemukan ${result.data.count} istilah.`, "success");
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Ekstraksi glosarium gagal.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setIsExtracting(false);
+    }
+  }
+
+  async function addAllCustomGlossaryTerms() {
+    if (!activeProject || !extractedTerms.length) return;
+    const newTerms = extractedTerms.filter(
+      (term) => !projectGlossary.some((entry) => entry.source_term === term.sourceTerm)
+    );
+    if (!newTerms.length) {
+      showToast("Semua istilah rekomendasi sudah terdaftar.", "info");
+      return;
+    }
+    setIsExtracting(true);
+    setMessage("Menyimpan semua istilah rekomendasi...");
+    try {
+      const insertData = newTerms.map((term) => ({
+        project_id: activeProject.id,
+        source_term: term.sourceTerm,
+        pinyin: term.pinyin,
+        translated_term: term.translatedTerm,
+        category: categoryMap[term.category] || term.category || "other",
+        notes: term.notes || null,
+      }));
+      const { data, error } = await supabase
+        .from("glossary_entries")
+        .insert(insertData)
+        .select("*");
+      if (error) throw error;
+      setProjectGlossary((current) => [...current, ...(data as ProjectGlossary[])]);
+      setMessage(`${data.length} istilah ditambahkan ke glosarium project`);
+      showToast(`${data.length} istilah berhasil ditambahkan secara massal!`, "success");
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Gagal menambahkan semua istilah.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setIsExtracting(false);
+    }
   }
 
   async function removeGlossaryTerm(term: ProjectGlossary) {
@@ -426,12 +643,18 @@ export function FunctionalWorkspace() {
     saving: "Menyimpan...",
     error: "Gagal menyimpan",
   };
+  const isUnlimited = profile?.plan === "admin";
+  const usagePercent = !isUnlimited && profile?.monthly_character_limit
+    ? Math.min(100, Math.round((profile.characters_used / profile.monthly_character_limit) * 100))
+    : 0;
 
   return (
     <main className={`studio-shell ${sidebarOpen ? "" : "studio-sidebar-collapsed"}`}>
+      {sidebarOpen && <button className="studio-sidebar-backdrop" aria-label="Tutup panel project" onClick={() => setSidebarOpen(false)} />}
       {sidebarOpen && (
         <aside className="studio-sidebar">
           <Link href="/" className="brand studio-brand"><span className="brand-mark">译</span><span>Alur<span>Dao</span></span></Link>
+          <button className="sidebar-mobile-close" aria-label="Tutup panel project" onClick={() => setSidebarOpen(false)}><X size={18} /></button>
           <button className="new-project-button" onClick={() => setProjectModalOpen(true)}><FilePlus2 size={17} /> Project baru</button>
 
           <div className="sidebar-label">Project</div>
@@ -442,7 +665,7 @@ export function FunctionalWorkspace() {
                   <span className="book-icon"><BookOpen size={16} /></span>
                   <span><strong>{project.title}</strong><small>{genreOptions.find((option) => option.id === project.genre)?.label}</small></span>
                 </button>
-                <button className="row-delete" aria-label={`Hapus ${project.title}`} onClick={() => void deleteProject(project)}><Trash2 size={13} /></button>
+                <button className="row-delete" aria-label={`Hapus ${project.title}`} title={`Hapus ${project.title}`} onClick={() => void deleteProject(project)}><Trash2 size={13} /></button>
               </div>
             ))}
             {!projects.length && <p className="sidebar-empty">Belum ada project.</p>}
@@ -450,7 +673,7 @@ export function FunctionalWorkspace() {
 
           {activeProject && (
             <>
-              <div className="sidebar-label sidebar-label-row"><span>Bab</span><button onClick={() => void addChapter()} aria-label="Tambah bab"><Plus size={14} /></button></div>
+              <div className="sidebar-label sidebar-label-row"><span>Bab</span><button onClick={() => void addChapter()} aria-label="Tambah bab" title="Tambah bab" disabled={isAddingChapter}>{isAddingChapter ? <LoaderCircle className="spinner" size={12} /> : <Plus size={14} />}</button></div>
               <nav className="chapter-list" aria-label="Daftar bab">
                 {chapters.map((chapter) => (
                   <button className={`chapter-item ${activeChapter?.id === chapter.id ? "active" : ""}`} key={chapter.id} onClick={() => selectChapter(chapter)}>
@@ -462,6 +685,13 @@ export function FunctionalWorkspace() {
           )}
 
           <div className="sidebar-bottom">
+            {profile && (
+              <div className="usage-box">
+                <div><span>Kuota bulanan</span><strong>{isUnlimited ? "∞" : `${usagePercent}%`}</strong></div>
+                <div className="usage-track"><i style={{ width: `${usagePercent}%` }} /></div>
+                <small>{isUnlimited ? "Tanpa batas · admin" : `${profile.characters_used.toLocaleString("id-ID")} dari ${profile.monthly_character_limit.toLocaleString("id-ID")} karakter · ${profile.plan}`}</small>
+              </div>
+            )}
             <button className="profile-button" onClick={() => void signOut()}>
               <span className="avatar">{userName.slice(0, 2).toUpperCase()}</span>
               <span><strong>{userName}</strong><small>Keluar dari akun</small></span>
@@ -474,7 +704,7 @@ export function FunctionalWorkspace() {
       <section className="studio-main">
         <header className="studio-topbar">
           <div><Link href="/" className="back-link"><ArrowLeft size={15} /> Beranda</Link><span className="crumb-divider">/</span><strong>{activeProject?.title || "Workspace"}</strong>{activeChapter && <span className="chapter-pill">Bab {activeChapter.chapter_number}</span>}</div>
-          <div className="topbar-actions"><span className={`saved-state ${saveState}`}><Check size={14} /> {saveLabels[saveState]}</span>{activeChapter && <button aria-label="Hapus bab" onClick={() => void deleteChapter()}><Trash2 size={16} /></button>}<button aria-label="Buka atau tutup panel" onClick={() => setSidebarOpen((open) => !open)}><PanelLeftClose size={18} /></button></div>
+          <div className="topbar-actions"><span className={`saved-state ${saveState}`}><Check size={14} /> {saveLabels[saveState]}</span><DisplayPreferences />{activeChapter && <button aria-label="Hapus bab" title="Hapus bab" onClick={() => void deleteChapter()} disabled={isDeleting}>{isDeleting ? <LoaderCircle className="spinner" size={14} /> : <Trash2 size={16} />}</button>}<button aria-label={sidebarOpen ? "Tutup panel project" : "Buka panel project"} title={sidebarOpen ? "Tutup panel project" : "Buka panel project"} onClick={() => setSidebarOpen((open) => !open)}>{sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}</button></div>
         </header>
 
         {!activeProject ? (
@@ -487,16 +717,15 @@ export function FunctionalWorkspace() {
               <div className="select-control"><span>Ke</span><select value={activeProject.target_language} onChange={(event) => void updateProjectSetting({ target_language: event.target.value })}><option value="id">Indonesia</option><option value="en">English</option></select></div>
               <div className="toolbar-spacer" />
               <button className="glossary-button" onClick={() => setGlossaryOpen(true)}><LibraryBig size={15} /> Glosarium <span>{projectGlossary.length}</span></button>
+              <button className="button button-primary button-small translate-button-top" onClick={() => void translate()} disabled={isTranslating || !sourceText.trim()}>{isTranslating ? <LoaderCircle className="spinner" size={14} /> : <Sparkles size={14} />}{isTranslating ? "Menerjemahkan..." : "Terjemahkan dengan AI"}</button>
               <label className="style-select"><span>Genre</span><select value={activeProject.genre} onChange={(event) => void updateProjectSetting({ genre: event.target.value as GenreId })}>{genreOptions.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</select></label>
               <label className="style-select"><span>Gaya</span><select value={activeProject.translation_style} onChange={(event) => void updateProjectSetting({ translation_style: event.target.value as Project["translation_style"] })}><option value="natural">Natural</option><option value="dramatic">Dramatis</option><option value="formal">Formal</option><option value="light">Ringan</option></select></label>
             </div>
 
             <div className="editor-grid">
-              <section className="editor-pane source-pane"><div className="pane-heading"><div><span className="pane-dot source" /> Teks sumber</div><button onClick={() => setSourceText("")}><RotateCcw size={14} /> Kosongkan</button></div><textarea aria-label="Teks Mandarin sumber" value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="Tempel teks novel Mandarin di sini..." /><div className="pane-footer"><span>{Array.from(sourceText).length.toLocaleString("id-ID")} karakter</span><span>Autosave aktif</span></div></section>
-              <section className="editor-pane result-pane"><div className="pane-heading"><div><span className="pane-dot result" /> Hasil terjemahan</div><button onClick={() => void copyTranslation()} disabled={!translation}>{copied ? <Check size={14} /> : <Clipboard size={14} />}{copied ? "Tersalin" : "Salin"}</button></div>{translation ? <div className="translation-output">{translation}</div> : <div className="empty-result"><span><Sparkles size={26} /></span><strong>Hasil akan muncul di sini</strong><p>AI akan menggunakan genre dan glosarium project ini.</p></div>}<div className="pane-footer"><span className="status-message"><Clock3 size={13} /> {message}</span><span>{Array.from(translation).length.toLocaleString("id-ID")} karakter</span></div></section>
+              <section className="editor-pane source-pane"><div className="pane-heading"><div><span className="pane-dot source" /> Teks sumber</div><button onClick={clearSource} disabled={!sourceText}><RotateCcw size={14} /> Kosongkan</button></div><textarea aria-label="Teks Mandarin sumber" value={sourceText} onChange={(event) => setSourceText(event.target.value)} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void translate(); } }} placeholder="Tempel teks novel Mandarin di sini. Tekan Ctrl+Enter untuk menerjemahkan." /><div className="pane-footer"><span>{Array.from(sourceText).length.toLocaleString("id-ID")} karakter</span><span>Autosave aktif</span></div></section>
+              <section className="editor-pane result-pane"><div className="pane-heading"><div><span className="pane-dot result" /> Hasil terjemahan</div><button onClick={() => void copyTranslation()} disabled={!translation}>{copied ? <Check size={14} /> : <Clipboard size={14} />}{copied ? "Tersalin" : "Salin"}</button></div>{translation ? <div className="translation-output">{translation}</div> : <div className="empty-result"><span><Sparkles size={26} /></span><strong>Mulai dalam 3 langkah</strong><ol><li>Tempel teks Mandarin di panel kiri.</li><li>Pilih genre, gaya, dan glosarium bila perlu.</li><li>Tekan “Terjemahkan dengan AI” atau Ctrl+Enter.</li></ol></div>}<div className="pane-footer"><span className="status-message"><Clock3 size={13} /> {message}</span><span>{Array.from(translation).length.toLocaleString("id-ID")} karakter</span></div></section>
             </div>
-
-            <footer className="studio-actionbar"><div className="glossary-preview"><span>Glosarium aktif</span>{projectGlossary.slice(0, 3).map((term) => <i key={term.id}>{term.source_term} → {term.translated_term}</i>)}{!projectGlossary.length && <i>Belum ada istilah</i>}</div><button className="button button-primary translate-button" onClick={() => void translate()} disabled={isTranslating || !sourceText.trim()}>{isTranslating ? <LoaderCircle className="spinner" size={18} /> : <Sparkles size={18} />}{isTranslating ? "Menerjemahkan..." : "Terjemahkan dengan AI"}</button></footer>
           </>
         )}
       </section>
@@ -509,7 +738,126 @@ export function FunctionalWorkspace() {
 
       {glossaryOpen && activeProject && (
         <div className="drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setGlossaryOpen(false); }}>
-          <aside className="glossary-drawer"><div className="drawer-heading"><div><span>Bank kosakata</span><h2>Glosarium {activeProject.title}</h2></div><button aria-label="Tutup glosarium" onClick={() => setGlossaryOpen(false)}><X size={19} /></button></div><div className="glossary-search"><Search size={16} /><input value={glossarySearch} onChange={(event) => setGlossarySearch(event.target.value)} placeholder="Cari Mandarin, pinyin, atau Indonesia..." /></div><div className="active-glossary"><h3>Istilah project ({projectGlossary.length})</h3>{projectGlossary.map((term) => <div className="glossary-row active-term" key={term.id}><div><strong>{term.source_term}</strong><small>{term.pinyin}</small></div><span>{term.translated_term}</span><button aria-label={`Hapus ${term.source_term}`} onClick={() => void removeGlossaryTerm(term)}><X size={14} /></button></div>)}{!projectGlossary.length && <p>Tambahkan istilah dari bank di bawah.</p>}</div><div className="global-glossary"><h3>Bank {genreOptions.find((option) => option.id === activeProject.genre)?.label}</h3>{glossaryLoading ? <div className="drawer-loading"><LoaderCircle className="spinner" size={20} /> Memuat istilah...</div> : globalTerms.map((term) => { const added = projectGlossary.some((entry) => entry.source_term === term.source_term); return <div className="glossary-row" key={term.id}><div><strong>{term.source_term}</strong><small>{term.pinyin} · {term.category}</small></div><span>{term.default_translation}</span><button disabled={added} aria-label={`Tambahkan ${term.source_term}`} onClick={() => void addGlossaryTerm(term)}>{added ? <Check size={14} /> : <Plus size={14} />}</button></div>; })}</div></aside>
+          <aside className="glossary-drawer">
+            <div className="drawer-heading">
+              <div>
+                <span>Bank kosakata</span>
+                <h2>Glosarium project</h2>
+                <p className="drawer-project-name" title={activeProject.title}>{activeProject.title}</p>
+              </div>
+              <button aria-label="Tutup glosarium" onClick={() => setGlossaryOpen(false)}>
+                <X size={19} />
+              </button>
+            </div>
+            
+            <div className="glossary-search">
+              <Search size={16} />
+              <input value={glossarySearch} onChange={(event) => setGlossarySearch(event.target.value)} placeholder="Cari Mandarin, pinyin, atau Indonesia..." />
+            </div>
+
+            <div className="glossary-actions">
+              <button
+                type="button"
+                className="button-scan"
+                onClick={() => void extractGlossary()}
+                disabled={isExtracting || !sourceText.trim()}
+              >
+                {isExtracting ? <LoaderCircle className="spinner" size={14} /> : <Sparkles size={14} />}
+                {isExtracting ? "Memindai Bab..." : "Pindai Bab (AI)"}
+              </button>
+            </div>
+
+            {extractedTerms.length > 0 && (
+              <div className="extracted-glossary">
+                <div className="extracted-glossary-header">
+                  <h3>Rekomendasi Bab (Pindai AI)</h3>
+                  <button
+                    type="button"
+                    className="button-add-all"
+                    onClick={() => void addAllCustomGlossaryTerms()}
+                    disabled={!extractedTerms.some((term) => !projectGlossary.some((entry) => entry.source_term === term.sourceTerm))}
+                  >
+                    Tambahkan Semua
+                  </button>
+                </div>
+                {extractedTerms.map((term, index) => {
+                  const added = projectGlossary.some((entry) => entry.source_term === term.sourceTerm);
+                  return (
+                    <div className="glossary-row" key={`ext-${index}`}>
+                      <div>
+                        <strong>{term.sourceTerm}</strong>
+                        <small>{term.pinyin} · {term.category}</small>
+                      </div>
+                      <span>{term.translatedTerm}</span>
+                      <button
+                        disabled={added}
+                        aria-label={`Tambahkan ${term.sourceTerm}`}
+                        onClick={() => void addCustomGlossaryTerm(term)}
+                      >
+                        {added ? <Check size={14} /> : <Plus size={14} />}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="active-glossary">
+              <h3>Istilah project ({projectGlossary.length})</h3>
+              {projectGlossary.map((term) => (
+                <div className="glossary-row active-term" key={term.id}>
+                  <div>
+                    <strong>{term.source_term}</strong>
+                    <small>{term.pinyin}</small>
+                  </div>
+                  <span>{term.translated_term}</span>
+                  <button aria-label={`Hapus ${term.source_term}`} onClick={() => void removeGlossaryTerm(term)}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              {!projectGlossary.length && <p>Tambahkan istilah dari bank di bawah.</p>}
+            </div>
+
+            <div className="global-glossary">
+              <h3>Bank {genreOptions.find((option) => option.id === activeProject.genre)?.label}</h3>
+              {glossaryLoading ? (
+                <div className="drawer-loading">
+                  <LoaderCircle className="spinner" size={20} /> Memuat istilah...
+                </div>
+              ) : (
+                globalTerms.map((term) => {
+                  const added = projectGlossary.some((entry) => entry.source_term === term.source_term);
+                  return (
+                    <div className="glossary-row" key={term.id}>
+                      <div>
+                        <strong>{term.source_term}</strong>
+                        <small>{term.pinyin} · {term.category}</small>
+                      </div>
+                      <span>{term.default_translation}</span>
+                      <button disabled={added} aria-label={`Tambahkan ${term.source_term}`} onClick={() => void addGlossaryTerm(term)}>
+                        {added ? <Check size={14} /> : <Plus size={14} />}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast-card ${toast.type}`}>
+              <span className="toast-icon">
+                {toast.type === "success" && <Check size={16} />}
+                {toast.type === "error" && <X size={16} />}
+                {toast.type === "info" && <Sparkles size={16} />}
+              </span>
+              <span className="toast-message">{toast.message}</span>
+            </div>
+          ))}
         </div>
       )}
     </main>

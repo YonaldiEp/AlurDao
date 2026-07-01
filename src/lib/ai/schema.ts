@@ -8,7 +8,8 @@ export const glossaryItemSchema = z.object({
 });
 
 export const translationRequestSchema = z.object({
-  sourceText: z.string().trim().min(1, "Teks sumber tidak boleh kosong.").max(30_000, "Maksimal 30.000 karakter per permintaan."),
+  chapterId: z.string().uuid().optional(),
+  sourceText: z.string().trim().min(1, "Teks sumber tidak boleh kosong.").max(20_000, "Maksimal 20.000 karakter per permintaan."),
   sourceLanguage: z.string().trim().default("Chinese"),
   targetLanguage: z.string().trim().default("Indonesian"),
   genre: z.enum(genreIds).default("xianxia"),
@@ -29,3 +30,11 @@ export type TranslationResult = {
   };
   durationMs: number;
 };
+
+export interface ExtractedTerm {
+  sourceTerm: string;
+  pinyin: string;
+  translatedTerm: string;
+  category: "character" | "sect" | "realm" | "technique" | "artifact" | "place" | "other";
+  notes?: string;
+}

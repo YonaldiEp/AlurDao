@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 const baseUrl = process.env.EVALUATION_BASE_URL || "http://127.0.0.1:3000";
+const accessToken = process.env.EVALUATION_ACCESS_TOKEN;
 const casesUrl = new URL("../evaluation/cases.json", import.meta.url);
 const cases = JSON.parse(await readFile(casesUrl, "utf8"));
 const results = [];
@@ -11,7 +12,10 @@ for (const testCase of cases) {
   try {
     const response = await fetch(`${baseUrl}/api/translate`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({
         sourceText: testCase.sourceText,
         sourceLanguage: "Chinese",

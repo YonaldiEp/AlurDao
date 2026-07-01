@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { DisplayPreferences } from "@/components/display-preferences";
+import { LandingDemo } from "@/components/landing-demo";
 import {
   ArrowRight,
   BookOpenText,
@@ -46,8 +48,11 @@ export default function Home() {
         <nav className="nav container" aria-label="Navigasi utama">
           <Brand />
           <div className="nav-links">
+            <a href="#demo">Demo</a>
             <a href="#fitur">Fitur</a>
             <a href="#cara-kerja">Cara kerja</a>
+            <a href="#paket">Paket</a>
+            <DisplayPreferences />
             <span className="nav-divider" />
             <Link className="button button-ghost" href="/auth">
               Masuk
@@ -75,13 +80,13 @@ export default function Home() {
             <Link className="button button-primary" href="/auth">
               Mulai menerjemahkan <ArrowRight size={18} />
             </Link>
-            <a className="text-link" href="#cara-kerja">
-              Lihat cara kerjanya
+            <a className="text-link" href="#demo">
+              Coba demo langsung
             </a>
           </div>
           <div className="trust-row">
             <span><Check size={16} /> Tanpa kartu kredit</span>
-            <span><Check size={16} /> Mode demo tersedia</span>
+            <span><Check size={16} /> 2 demo tanpa daftar</span>
           </div>
         </div>
 
@@ -135,6 +140,8 @@ export default function Home() {
         </div>
       </section>
 
+      <LandingDemo />
+
       <section className="section container" id="fitur">
         <div className="section-heading">
           <span className="kicker">Bukan sekadar terjemahan mesin</span>
@@ -163,10 +170,21 @@ export default function Home() {
             <h2>Dari naskah mentah menjadi bab yang siap dibaca.</h2>
           </div>
           <ol className="steps">
-            <li><span>1</span><div><strong>Tempel naskah</strong><p>Masukkan teks Mandarin atau unggah bab.</p></div></li>
+            <li><span>1</span><div><strong>Tempel naskah</strong><p>Tempel teks Mandarin ke editor bab.</p></div></li>
             <li><span>2</span><div><strong>Pilih gaya</strong><p>Atur nada dan glosarium sesuai novelmu.</p></div></li>
             <li><span>3</span><div><strong>Terjemahkan & sunting</strong><p>AI membuat draf, kamu tetap memegang kendali.</p></div></li>
           </ol>
+        </div>
+      </section>
+
+      <section className="section plans-section" id="paket">
+        <div className="container">
+          <div className="section-heading"><span className="kicker">Mulai sesuai kebutuhan</span><h2>Dari mencoba gratis hingga menerjemahkan lebih serius.</h2></div>
+          <div className="plan-grid">
+            <article className="plan-card"><span>Demo</span><h3>Tanpa akun</h3><ul><li>2 percobaan per 24 jam</li><li>500 karakter per percobaan</li><li>Natural dan Ringan</li></ul><a href="#demo">Coba sekarang</a></article>
+            <article className="plan-card featured"><span>Free</span><h3>Untuk mulai project</h3><ul><li>15.000 karakter per bulan</li><li>2 project dan 10 bab/project</li><li>Glosarium serta autosave</li></ul><Link href="/auth">Buat akun Free</Link></article>
+            <article className="plan-card"><span>Premium · segera hadir</span><h3>Untuk penerjemah aktif</h3><ul><li>Kuota dan project lebih besar</li><li>Prioritas pemrosesan</li><li>Fitur workflow lanjutan</li></ul><div className="plan-status">Belum tersedia</div></article>
+          </div>
         </div>
       </section>
 
