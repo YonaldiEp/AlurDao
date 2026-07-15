@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "evaluate": "node scripts/evaluate-translations.mjs"
+    "evaluate": "node scripts/evaluate-translations.mjs",
+    "evaluate:mistral": "node --conditions=react-server --env-file=.env.local --import tsx scripts/evaluate-mistral.ts",
+    "postinstall": "node scripts/copy-swagger-assets.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -16,6 +18,7 @@
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -27,6 +30,8 @@
     "eslint-config-next": "16.2.9",
     "supabase": "^2.109.0",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
+    "swagger-ui-dist": "^5.32.8",
     "typescript": "^5"
   }
 }

@@ -134,6 +134,7 @@ export function AuthForm() {
               <div><LockKeyhole size={17} /><input type={showPassword ? "text" : "password"} minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required placeholder="Minimal 8 karakter" autoComplete={mode === "login" ? "current-password" : "new-password"} /><button type="button" className="password-toggle" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"} title={showPassword ? "Sembunyikan password" : "Tampilkan password"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div>
             </label>
             <p className="auth-helper">{mode === "login" ? "Gunakan akun yang pernah kamu daftarkan atau masuk lebih cepat dengan Google." : "Gunakan minimal 8 karakter. Setelah mendaftar, kamu mungkin perlu mengonfirmasi email."}</p>
+            {mode === "login" && <Link href="/auth/forgot-password" className="forgot-link">Lupa password?</Link>}
 
             {message && <div className="auth-message" role="status" aria-live="polite">{message}</div>}
 

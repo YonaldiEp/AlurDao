@@ -2,13 +2,15 @@
 
 Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis, dan langkah berikutnya.
 
+Pembaruan dokumentasi 2 Juli 2026: README utama telah disusun ulang mengikuti pola dokumentasi project multi-bagian—overview, status, arsitektur, quick start, konfigurasi, fitur, API, database, pengujian, troubleshooting, dan struktur direktori—dengan gaya visual minimal tanpa badge atau dekorasi berlebihan.
+
 ## Status
 
 - [x] Landing page dan workspace awal
 - [x] Demo terjemahan landing page: 2 percobaan/24 jam, 500 karakter, cookie HMAC HttpOnly
-- [x] Perbandingan paket Demo, Free, dan Premium (segera hadir) pada landing page
+- [x] Perbandingan paket Demo, Free, dan Premium pada landing page
 - [x] Supabase PostgreSQL, migration, relasi, dan Row Level Security
-- [x] Project Supabase Cloud AlurDao terhubung dan migration 001-006 tersinkron
+- [x] Project Supabase Cloud AlurDao terhubung dan migration 001-010 tersinkron
 - [x] Adapter demo, Mistral, Gemini, Groq, dan Ollama
 - [x] Konfigurasi awal enam genre novel China
 - [x] Kontrak response API JSON yang konsisten
@@ -16,9 +18,12 @@ Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis
 - [x] Konfigurasi enam genre dipusatkan dalam satu modul
 - [x] Bank kosakata global dan override glosarium project
 - [x] Endpoint pencarian kosakata berdasarkan teks dan genre
+- [x] Demo landing page mendukung empat gaya terjemahan: Natural, Dramatis, Formal, dan Ringan
+- [x] UX glosarium diperbarui dengan summary, checkbox, pilih semua terlihat, batal pilih, dan tambah istilah terpilih
+- [x] Prompt terjemahan diperketat agar AI tidak menambah adegan, nama, atau informasi di luar teks sumber
 - [x] Dataset evaluasi awal dengan satu kasus untuk setiap genre
 - [x] Evaluation runner JSON untuk konsistensi istilah dan deteksi source-copy
-- [ ] Evaluasi kualitas semantik dengan provider Mistral
+- [x] Evaluasi otomatis enam genre dengan Mistral: 6/6 lulus
 - [ ] Perbandingan hasil Mistral dengan Ollama lokal
 - [x] Autentikasi email/password melalui Supabase Auth
 - [x] CRUD project dan chapter dengan Row Level Security
@@ -28,6 +33,9 @@ Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis
 - [x] Logout dan kontrol sidebar
 - [x] Google OAuth button dan callback PKCE
 - [x] Google OAuth credentials aktif pada Supabase Cloud; endpoint terverifikasi redirect ke Google
+- [ ] Google OAuth diuji interaktif sampai kembali ke Studio
+- [x] Reset password melalui email dan halaman pembuatan password baru
+- [x] Upload bab `.txt`/`.md` maksimal 1 MB dengan konfirmasi sebelum mengganti teks
 - [x] Paket free: 2 project, 10 bab/project, 15.000 karakter/bulan, 5.000 karakter/request
 - [x] Role admin tanpa kuota bulanan, maksimal 20.000 karakter/request, dengan plan/limit terkunci dari browser
 - [x] Auth wajib pada endpoint terjemahan
@@ -39,11 +47,21 @@ Dokumen ini mencatat fitur yang telah selesai, pekerjaan aktif, keputusan teknis
 - [x] Perbaikan overflow card dan ellipsis judul project pada sidebar
 - [x] Prompt penyuntingan akhir untuk SPOK, PUEBI, typo, repetisi, dan konsistensi bahasa target
 - [x] Catatan revisi manual PPT untuk nilai jual slide 3 dan indexing Google slide 5
+- [x] Billing Premium dijadikan placeholder untuk demo; transaksi Midtrans nyata dinonaktifkan secara default
+- [x] Skema pembayaran Midtrans Sandbox dan webhook tetap tersedia untuk tahap berikutnya melalui `MIDTRANS_ENABLE_REAL_CHECKOUT=true`
+- [x] Monitoring request/error API dan dashboard admin
+- [x] Dokumentasi API Swagger/OpenAPI di `/docs/api` dan `/api/openapi`
+- [x] Asset vendor Swagger dikecualikan dari ESLint agar pemeriksaan hanya menilai source code aplikasi
+- [x] `.gitignore` diperbarui untuk cache Next.js, Supabase lokal, test report, asset Swagger hasil generate, dan hasil evaluasi lokal
+- [x] Audit UI/UX landing, auth, dan docs API dengan Edge headless; overflow genre strip mobile dan copy limit project diperbaiki
+- [x] Audit responsif lanjutan pada mobile 360/390, tablet 768, laptop 1366, dan FHD 1920; genre strip tablet dan dekorasi hero mobile dirapikan agar tidak overflow
+- [x] Area Studio diperkuat untuk mencegah teks panjang tertutup sidebar/topbar: judul memakai ellipsis, toolbar bisa wrap, dan select bahasa tidak melebar keluar panel
+- [ ] Kredensial Midtrans, Service Role server, Redirect URL Cloud, dan SMTP production dikonfigurasi saat checkout nyata akan diaktifkan
 - [ ] Persiapan layanan Python untuk AI lokal lanjutan
 
 ## Sedang Dikerjakan
 
-Menguji login Google secara interaktif sampai kembali ke Studio, lalu menjalankan evaluasi semantik enam genre.
+Menyelesaikan satu pengujian Google OAuth interaktif sampai Studio. Billing Midtrans dipertahankan sebagai placeholder sampai tahap integrasi pembayaran nyata.
 
 ## Keputusan Teknis
 
@@ -59,6 +77,7 @@ Menguji login Google secara interaktif sampai kembali ke Studio, lalu menjalanka
 - Workspace menggunakan Supabase secara langsung dengan perlindungan RLS.
 - Kuota freemium ditegakkan oleh PostgreSQL dan endpoint server, bukan UI.
 - Request AI tanpa sesi login ditolak sebelum provider dipanggil.
+- Swagger UI disajikan sebagai asset statis di `public/swagger-ui` dan tidak dilint sebagai source aplikasi.
 
 ## Pengujian Fitur Nyata
 
@@ -72,6 +91,14 @@ Menguji login Google secara interaktif sampai kembali ke Studio, lalu menjalanka
 - Terjemahan dan penyimpanan hasil: lulus
 - Penambahan Bab 2: lulus
 
+### Audit kode lokal — 15 Juli 2026
+
+- Temuan: `npm run lint` sempat gagal karena ESLint membaca file vendor `public/swagger-ui/swagger-ui-bundle.js`.
+- Perbaikan: `public/swagger-ui/**` ditambahkan ke global ignore ESLint.
+- Temuan UI: genre strip pada landing mobile memakai horizontal scroll; diubah menjadi chip yang wrap agar lebih nyaman di layar kecil.
+- Temuan copy: pesan batas project masih menyebut 3 project, diselaraskan menjadi batas project paket Free.
+- Hasil validasi: `npm run lint`, build production, landing, auth, docs API, OpenAPI JSON, dan asset Swagger lulus pada audit terakhir.
+
 ## Hasil Evaluasi
 
 ### Smoke Test Mistral - 1 Juli 2026
@@ -80,7 +107,16 @@ Menguji login Google secara interaktif sampai kembali ke Studio, lalu menjalanka
 - Provider `mistral-small-latest`: lulus
 - Hasil Mandarin ke Indonesia: lulus
 - Pencatatan kuota server: lulus
-- Evaluasi semantik penuh untuk enam genre: belum dijalankan
+- Evaluasi awal satu kalimat: lulus
+
+### Evaluasi Mistral Enam Genre — 2 Juli 2026
+
+- Provider/model: Mistral `mistral-small-latest`
+- Kasus: Xianxia, Xuanhuan, Wuxia, Qihuan, Mohuan, dan Kehuan
+- Pemeriksaan otomatis lulus: 6/6 (100%)
+- Glosarium wajib: seluruh istilah ditemukan
+- Source-copy, repetisi, dan istilah asing terlarang: tidak ditemukan
+- Catatan manual: hasil Qihuan masih dapat diperhalus dari “Seorang penyihir muda itu” menjadi “Penyihir muda itu”.
 
 ### Baseline Demo — 1 Juli 2026
 

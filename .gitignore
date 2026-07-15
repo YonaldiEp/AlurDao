@@ -12,9 +12,13 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
+/.next-build/
+/.next-dev/
 /out/
 
 # production
@@ -22,13 +26,18 @@
 
 # misc
 .DS_Store
+Thumbs.db
+desktop.ini
 *.pem
+*.local
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
 
 # env files (can opt-in for committing if needed)
 .env*
@@ -37,6 +46,16 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase local runtime
+supabase/.branches/
+supabase/.temp/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# generated swagger assets (copied by postinstall)
+/public/swagger-ui/
+
+# local evaluation output
+/evaluation/results/

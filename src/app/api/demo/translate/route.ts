@@ -22,7 +22,7 @@ const demoRequestSchema = z.object({
     `Demo maksimal ${DEMO_MAX_CHARACTERS} karakter.`,
   ),
   genre: z.enum(genreIds).default("xianxia"),
-  style: z.enum(["natural", "light"]).default("natural"),
+  style: z.enum(["natural", "dramatic", "formal", "light"]).default("natural"),
 });
 
 function createContext() {

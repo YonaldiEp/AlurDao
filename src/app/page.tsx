@@ -5,6 +5,7 @@ import {
   ArrowRight,
   BookOpenText,
   Check,
+  FileCode2,
   Languages,
   LibraryBig,
   Sparkles,
@@ -52,6 +53,7 @@ export default function Home() {
             <a href="#fitur">Fitur</a>
             <a href="#cara-kerja">Cara kerja</a>
             <a href="#paket">Paket</a>
+            <Link href="/docs/api" className="nav-api-link"><FileCode2 size={14} /> API</Link>
             <DisplayPreferences />
             <span className="nav-divider" />
             <Link className="button button-ghost" href="/auth">
@@ -183,7 +185,7 @@ export default function Home() {
           <div className="plan-grid">
             <article className="plan-card"><span>Demo</span><h3>Tanpa akun</h3><ul><li>2 percobaan per 24 jam</li><li>500 karakter per percobaan</li><li>Natural dan Ringan</li></ul><a href="#demo">Coba sekarang</a></article>
             <article className="plan-card featured"><span>Free</span><h3>Untuk mulai project</h3><ul><li>15.000 karakter per bulan</li><li>2 project dan 10 bab/project</li><li>Glosarium serta autosave</li></ul><Link href="/auth">Buat akun Free</Link></article>
-            <article className="plan-card"><span>Premium · segera hadir</span><h3>Untuk penerjemah aktif</h3><ul><li>Kuota dan project lebih besar</li><li>Prioritas pemrosesan</li><li>Fitur workflow lanjutan</li></ul><div className="plan-status">Belum tersedia</div></article>
+            <article className="plan-card"><span>Premium</span><h3>Untuk penerjemah aktif</h3><ul><li>100.000 karakter per 30 hari</li><li>10 project dan 100 bab/project</li><li>Maksimal 10.000 karakter/request</li></ul><Link href="/billing">Lihat paket Premium</Link></article>
           </div>
         </div>
       </section>
@@ -204,6 +206,9 @@ export default function Home() {
       <footer className="footer container">
         <Brand />
         <p>Terjemahkan dengan cepat. Ceritakan dengan utuh.</p>
+        <div className="footer-links">
+          <Link href="/docs/api"><FileCode2 size={14} /> Dokumentasi API</Link>
+        </div>
         <span>© 2026 AlurDao</span>
       </footer>
     </main>

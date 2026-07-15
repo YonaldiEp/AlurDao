@@ -102,6 +102,7 @@ function buildPrompt(input: TranslationRequest) {
 Tugas utama: terjemahkan seluruh teks dari ${input.sourceLanguage} ke ${input.targetLanguage}.
 
 ATURAN WAJIB:
+0. Batas terjemahan hanya teks sumber yang berada di dalam tag <SOURCE_TEXT> dan </SOURCE_TEXT>. Jika teks sumber hanya satu kalimat pendek, jawab hanya terjemahan satu kalimat itu. DILARANG menambahkan nama tokoh, lokasi, adegan, dialog, paragraf, atau informasi yang tidak tertulis di teks sumber.
 1. Hasil akhir harus sepenuhnya berbahasa Indonesia. DILARANG KERAS menyisipkan kata/istilah bahasa Inggris untuk elemen umum (misalnya: dilarang menulis 'County', 'City', 'Section', 'Chapter', dll; wajib gunakan 'Kabupaten/Wilayah', 'Kota', 'Bagian', 'Bab'). Bahasa Inggris HANYA diperbolehkan untuk nama teknik/jurus/sistem kultivasi jika memang tidak ada padanan bahasa Indonesia yang cocok.
 2. Kalimat terjemahan harus mengikuti tata kalimat Indonesia yang baik dan benar (SPOK). Struktur kalimat bahasa Mandarin (seperti kata depan/keterangan yang terbalik atau struktur kalimat pasif yang tidak alami dalam bahasa Indonesia) harus didekonstruksi dan disusun ulang agar mengalir alami di bahasa Indonesia.
 3. Utamakan kesepadanan makna dan konteks, bukan terjemahan kata per kata. Jangan menambah, menghapus, merangkum, atau mengarang informasi.
@@ -119,10 +120,11 @@ Sebelum menjawab, lakukan penyuntingan akhir secara diam-diam:
 - Pastikan nama tempat dan nama tokoh tidak tertukar atau mengalami salah terjemah akibat kontaminasi baris lain (contoh: jika sumber menulis '洛水县' (Loshui), jangan terjemahkan menjadi 'Jiangning');
 - Baca ulang setiap kalimat sebagai prosa Indonesia dan perbaiki bagian yang terdengar kaku.
 
-Keluarkan hanya teks terjemahan final yang sudah disunting. Jangan tampilkan analisis, komentar, label, atau penjelasan.${glossary}
+Keluarkan hanya teks terjemahan final yang sudah disunting. Jangan tampilkan analisis, komentar, label, atau penjelasan. Jangan menerjemahkan tag <SOURCE_TEXT>; tag hanya pembatas internal.${glossary}
 
-Teks sumber:
-${input.sourceText}`;
+<SOURCE_TEXT>
+${input.sourceText}
+</SOURCE_TEXT>`;
 }
 
 async function openAICompatible(
@@ -142,11 +144,11 @@ async function openAICompatible(
         messages: [
           {
             role: "system",
-            content: "You translate fiction accurately and return only the translated prose.",
+            content: "You translate fiction faithfully. Never add scenes, names, dialogue, or facts not present in the source. Return only the translated prose.",
           },
           { role: "user", content: buildPrompt(input) },
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         stream: false,
       }),
     },

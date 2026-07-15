@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
   Check,
   Clipboard,
   Clock3,
+  CreditCard,
   FilePlus2,
   Languages,
   LibraryBig,
@@ -21,6 +22,7 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { genreOptions, type GenreId } from "@/config/genres";
@@ -112,6 +114,7 @@ export function FunctionalWorkspace() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const lastSavedRef = useRef("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [booting, setBooting] = useState(true);
   const [userName, setUserName] = useState("Pengguna");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -134,6 +137,7 @@ export function FunctionalWorkspace() {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [glossarySearch, setGlossarySearch] = useState("");
   const [globalTerms, setGlobalTerms] = useState<GlobalTerm[]>([]);
+  const [selectedGlobalTermIds, setSelectedGlobalTermIds] = useState<string[]>([]);
   const [glossaryLoading, setGlossaryLoading] = useState(false);
   const [extractedTerms, setExtractedTerms] = useState<ExtractedTerm[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -296,6 +300,7 @@ export function FunctionalWorkspace() {
         .then((result) => {
           if (!result.success) throw new Error(result.error.message);
           setGlobalTerms(result.data.terms);
+          setSelectedGlobalTermIds((current) => current.filter((id) => result.data.terms.some((term) => term.id === id)));
         })
         .catch((error) => setMessage(error instanceof Error ? error.message : "Kosakata gagal dimuat."))
         .finally(() => setGlossaryLoading(false));
@@ -339,7 +344,7 @@ export function FunctionalWorkspace() {
     setCreatingProject(false);
     if (error) {
       setMessage(error.message.includes("PROJECT_LIMIT_REACHED")
-        ? "Batas 3 project untuk paket Gratis telah tercapai."
+        ? "Batas project untuk paket Free telah tercapai."
         : error.message);
       return;
     }
@@ -447,6 +452,30 @@ export function FunctionalWorkspace() {
     }
   }
 
+  async function importChapterFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!extension || !["txt", "md"].includes(extension)) {
+      showToast("Gunakan file .txt atau .md agar format naskah tetap aman.", "error");
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      showToast("Ukuran file maksimal 1 MB.", "error");
+      return;
+    }
+    const text = (await file.text()).replace(/^\uFEFF/, "").trim();
+    if (!text) {
+      showToast("File tidak berisi teks yang dapat dibaca.", "error");
+      return;
+    }
+    if (sourceText.trim() && !window.confirm("Ganti teks sumber saat ini dengan isi file?")) return;
+    setSourceText(text);
+    setMessage(`${file.name} berhasil dimuat dan akan disimpan otomatis`);
+    showToast("File bab berhasil dimuat.", "success");
+  }
+
   async function updateProjectSetting(update: Partial<Project>) {
     if (!activeProject) return;
     const nextProject = { ...activeProject, ...update };
@@ -519,6 +548,65 @@ export function FunctionalWorkspace() {
     if (error) { setMessage(error.message); return; }
     setProjectGlossary((current) => [...current, data as ProjectGlossary]);
     setMessage(`${term.source_term} ditambahkan ke glosarium project`);
+  }
+
+  function toggleGlobalTermSelection(term: GlobalTerm) {
+    if (projectGlossary.some((entry) => entry.source_term === term.source_term)) return;
+    setSelectedGlobalTermIds((current) => (
+      current.includes(term.id)
+        ? current.filter((id) => id !== term.id)
+        : [...current, term.id]
+    ));
+  }
+
+  function selectVisibleGlobalTerms() {
+    const addableIds = globalTerms
+      .filter((term) => !projectGlossary.some((entry) => entry.source_term === term.source_term))
+      .map((term) => term.id);
+    setSelectedGlobalTermIds(addableIds);
+  }
+
+  async function addSelectedGlobalTerms() {
+    if (!activeProject || !selectedGlobalTermIds.length) return;
+    const selectedTerms = globalTerms.filter((term) => (
+      selectedGlobalTermIds.includes(term.id) &&
+      !projectGlossary.some((entry) => entry.source_term === term.source_term)
+    ));
+    if (!selectedTerms.length) {
+      setSelectedGlobalTermIds([]);
+      showToast("Semua istilah terpilih sudah ada di glosarium project.", "info");
+      return;
+    }
+
+    setGlossaryLoading(true);
+    try {
+      const insertData = selectedTerms.map((term) => ({
+        project_id: activeProject.id,
+        global_term_id: term.id,
+        source_term: term.source_term,
+        pinyin: term.pinyin,
+        translated_term: term.default_translation,
+        category: categoryMap[term.category] || "other",
+        notes: term.definition,
+      }));
+
+      const { data, error } = await supabase
+        .from("glossary_entries")
+        .insert(insertData)
+        .select("*");
+      if (error) throw error;
+
+      setProjectGlossary((current) => [...current, ...(data as ProjectGlossary[])]);
+      setSelectedGlobalTermIds([]);
+      setMessage(`${data.length} istilah ditambahkan ke glosarium project`);
+      showToast(`${data.length} istilah berhasil ditambahkan ke glosarium.`, "success");
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Gagal menambahkan istilah terpilih.";
+      setMessage(errMsg);
+      showToast(errMsg, "error");
+    } finally {
+      setGlossaryLoading(false);
+    }
   }
 
   async function addCustomGlossaryTerm(term: {
@@ -647,6 +735,8 @@ export function FunctionalWorkspace() {
   const usagePercent = !isUnlimited && profile?.monthly_character_limit
     ? Math.min(100, Math.round((profile.characters_used / profile.monthly_character_limit) * 100))
     : 0;
+  const addableGlobalTerms = globalTerms.filter((term) => !projectGlossary.some((entry) => entry.source_term === term.source_term));
+  const selectedAddableCount = selectedGlobalTermIds.filter((id) => addableGlobalTerms.some((term) => term.id === id)).length;
 
   return (
     <main className={`studio-shell ${sidebarOpen ? "" : "studio-sidebar-collapsed"}`}>
@@ -692,6 +782,8 @@ export function FunctionalWorkspace() {
                 <small>{isUnlimited ? "Tanpa batas · admin" : `${profile.characters_used.toLocaleString("id-ID")} dari ${profile.monthly_character_limit.toLocaleString("id-ID")} karakter · ${profile.plan}`}</small>
               </div>
             )}
+            {profile?.plan !== "admin" && <Link className="upgrade-link" href="/billing"><CreditCard size={15} /> {profile?.plan === "premium" ? "Kelola Premium" : "Upgrade Premium"}</Link>}
+            {profile?.plan === "admin" && <Link className="upgrade-link" href="/admin/monitoring">Monitoring API</Link>}
             <button className="profile-button" onClick={() => void signOut()}>
               <span className="avatar">{userName.slice(0, 2).toUpperCase()}</span>
               <span><strong>{userName}</strong><small>Keluar dari akun</small></span>
@@ -717,6 +809,8 @@ export function FunctionalWorkspace() {
               <div className="select-control"><span>Ke</span><select value={activeProject.target_language} onChange={(event) => void updateProjectSetting({ target_language: event.target.value })}><option value="id">Indonesia</option><option value="en">English</option></select></div>
               <div className="toolbar-spacer" />
               <button className="glossary-button" onClick={() => setGlossaryOpen(true)}><LibraryBig size={15} /> Glosarium <span>{projectGlossary.length}</span></button>
+              <input ref={fileInputRef} className="visually-hidden" type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(event) => void importChapterFile(event)} />
+              <button className="upload-button" type="button" onClick={() => fileInputRef.current?.click()} title="Unggah file teks maksimal 1 MB"><Upload size={15} /> Unggah bab</button>
               <button className="button button-primary button-small translate-button-top" onClick={() => void translate()} disabled={isTranslating || !sourceText.trim()}>{isTranslating ? <LoaderCircle className="spinner" size={14} /> : <Sparkles size={14} />}{isTranslating ? "Menerjemahkan..." : "Terjemahkan dengan AI"}</button>
               <label className="style-select"><span>Genre</span><select value={activeProject.genre} onChange={(event) => void updateProjectSetting({ genre: event.target.value as GenreId })}>{genreOptions.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</select></label>
               <label className="style-select"><span>Gaya</span><select value={activeProject.translation_style} onChange={(event) => void updateProjectSetting({ translation_style: event.target.value as Project["translation_style"] })}><option value="natural">Natural</option><option value="dramatic">Dramatis</option><option value="formal">Formal</option><option value="light">Ringan</option></select></label>
@@ -755,6 +849,12 @@ export function FunctionalWorkspace() {
               <input value={glossarySearch} onChange={(event) => setGlossarySearch(event.target.value)} placeholder="Cari Mandarin, pinyin, atau Indonesia..." />
             </div>
 
+            <div className="glossary-summary">
+              <article><strong>{projectGlossary.length}</strong><span>Istilah project</span></article>
+              <article><strong>{addableGlobalTerms.length}</strong><span>Bisa ditambahkan</span></article>
+              <article><strong>{selectedAddableCount}</strong><span>Terpilih</span></article>
+            </div>
+
             <div className="glossary-actions">
               <button
                 type="button"
@@ -765,6 +865,14 @@ export function FunctionalWorkspace() {
                 {isExtracting ? <LoaderCircle className="spinner" size={14} /> : <Sparkles size={14} />}
                 {isExtracting ? "Memindai Bab..." : "Pindai Bab (AI)"}
               </button>
+              <div className="glossary-bulk-actions">
+                <button type="button" onClick={selectVisibleGlobalTerms} disabled={!addableGlobalTerms.length || glossaryLoading}>Pilih semua terlihat</button>
+                <button type="button" onClick={() => setSelectedGlobalTermIds([])} disabled={!selectedGlobalTermIds.length || glossaryLoading}>Batal pilih</button>
+                <button type="button" className="primary" onClick={() => void addSelectedGlobalTerms()} disabled={!selectedAddableCount || glossaryLoading}>
+                  {glossaryLoading && selectedAddableCount ? <LoaderCircle className="spinner" size={13} /> : <Plus size={13} />}
+                  Tambah terpilih
+                </button>
+              </div>
             </div>
 
             {extractedTerms.length > 0 && (
@@ -828,8 +936,17 @@ export function FunctionalWorkspace() {
               ) : (
                 globalTerms.map((term) => {
                   const added = projectGlossary.some((entry) => entry.source_term === term.source_term);
+                  const selected = selectedGlobalTermIds.includes(term.id);
                   return (
-                    <div className="glossary-row" key={term.id}>
+                    <div className={`glossary-row bank-term ${selected ? "selected" : ""} ${added ? "added" : ""}`} key={term.id}>
+                      <label className="term-check" title={added ? "Sudah ada di project" : "Pilih istilah"}>
+                        <input
+                          type="checkbox"
+                          checked={added || selected}
+                          disabled={added}
+                          onChange={() => toggleGlobalTermSelection(term)}
+                        />
+                      </label>
                       <div>
                         <strong>{term.source_term}</strong>
                         <small>{term.pinyin} · {term.category}</small>

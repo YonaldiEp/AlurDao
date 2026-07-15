@@ -22,7 +22,7 @@ type DemoResult = TranslationResult & { demo: DemoStatus };
 export function LandingDemo() {
   const [sourceText, setSourceText] = useState(sampleText);
   const [genre, setGenre] = useState<GenreId>("xianxia");
-  const [style, setStyle] = useState<"natural" | "light">("natural");
+  const [style, setStyle] = useState<"natural" | "dramatic" | "formal" | "light">("natural");
   const [translation, setTranslation] = useState("");
   const [status, setStatus] = useState<DemoStatus>({ limit: 2, used: 0, remaining: 2, resetAt: "" });
   const [message, setMessage] = useState("Siap mencoba terjemahan nyata.");
@@ -82,7 +82,7 @@ export function LandingDemo() {
             <textarea value={sourceText} maxLength={500} onChange={(event) => setSourceText(event.target.value)} aria-label="Teks Mandarin untuk demo" />
             <div className="demo-controls">
               <label><span>Genre</span><select value={genre} onChange={(event) => setGenre(event.target.value as GenreId)}>{genreOptions.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}</select></label>
-              <label><span>Gaya</span><select value={style} onChange={(event) => setStyle(event.target.value as "natural" | "light")}><option value="natural">Natural</option><option value="light">Ringan</option></select></label>
+              <label><span>Gaya</span><select value={style} onChange={(event) => setStyle(event.target.value as "natural" | "dramatic" | "formal" | "light")}><option value="natural">Natural</option><option value="dramatic">Dramatis</option><option value="formal">Formal</option><option value="light">Ringan</option></select></label>
               <button className="button button-primary demo-run-button" onClick={() => void runDemo()} disabled={loading || exhausted || !sourceText.trim()}>{loading ? <LoaderCircle className="spinner" size={18} /> : <Sparkles size={18} />}{loading ? "Menerjemahkan..." : exhausted ? "Batas demo habis" : "Coba terjemahkan"}</button>
             </div>
           </section>

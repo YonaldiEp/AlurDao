@@ -24,7 +24,7 @@ export const genreProfiles: Record<GenreId, GenreProfile> = {
     hanzi: "仙侠",
     description: "Kultivasi, Dao, keabadian, sekte, dan dunia spiritual.",
     translationInstruction:
-      "Jaga konsistensi istilah kultivasi, Dao, sekte, ranah, teknik, pil, dan artefak.",
+      "Jaga konsistensi istilah kultivasi, Dao, sekte, ranah, teknik, pil, dan artefak. Gabungkan enklitik Indonesia secara wajar: tulis 'dantiannya', bukan 'dantian-nya'.",
   },
   xuanhuan: {
     id: "xuanhuan",
@@ -40,7 +40,7 @@ export const genreProfiles: Record<GenreId, GenreProfile> = {
     hanzi: "武侠",
     description: "Dunia persilatan, jianghu, perguruan, dan kehormatan.",
     translationInstruction:
-      "Pertahankan nuansa jianghu, gelar kehormatan, perguruan, ilmu bela diri, dan hubungan antartokoh.",
+      "Pertahankan nuansa jianghu, gelar kehormatan, perguruan, ilmu bela diri, dan hubungan antartokoh. Untuk gerakan bela diri gunakan verba alami seperti mengerahkan, melancarkan, atau menggunakan; hindari frasa birokratis seperti 'menerapkan ilmu'.",
   },
   qihuan: {
     id: "qihuan",
@@ -48,7 +48,7 @@ export const genreProfiles: Record<GenreId, GenreProfile> = {
     hanzi: "奇幻",
     description: "Fantasi dengan sihir, ras, makhluk, dan dunia rekaan.",
     translationInstruction:
-      "Jaga istilah sihir, ras, makhluk, tempat, dan worldbuilding fantasi secara konsisten.",
+      "Jaga istilah sihir, ras, makhluk, tempat, dan worldbuilding fantasi secara konsisten. Dalam konteks fantasi, 法师 wajib diterjemahkan sebagai penyihir, bukan mage atau pendeta; 法杖 berarti tongkat sihir. Hindari konstruksi tidak efektif seperti 'seorang ... itu'; pilih 'penyihir muda itu'.",
   },
   mohuan: {
     id: "mohuan",
@@ -56,7 +56,7 @@ export const genreProfiles: Record<GenreId, GenreProfile> = {
     hanzi: "魔幻",
     description: "Fantasi magis, supernatural, dan mitologi.",
     translationInstruction:
-      "Pertahankan atmosfer fantasi magis, nama entitas, mantra, kekuatan supernatural, dan mitologinya.",
+      "Pertahankan atmosfer fantasi magis, nama entitas, mantra, kekuatan supernatural, dan mitologinya. Terjemahkan 深渊 sebagai jurang maut/abyss sesuai konteks, bukan frasa harfiah 'jurang dalam'.",
   },
   kehuan: {
     id: "kehuan",
